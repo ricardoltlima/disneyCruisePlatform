@@ -9,5 +9,4 @@ public class CruiseSearchServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(CruiseSearchServiceApplication.class, args);
     }
-
 }

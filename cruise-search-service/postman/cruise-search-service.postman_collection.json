@@ -1,0 +1,351 @@
+{
+  "info": {
+    "_postman_id": "6dc025b4-36fb-4e07-b42f-c9ca9dd160d9",
+    "name": "Cruise Search Service",
+    "description": "Basic requests and tests for the Cruise Search Service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('idempotencyKey') || pm.environment.get('idempotencyKey') === 'replace-with-idempotency-key') {",
+          "  pm.environment.set('idempotencyKey', `cruise-create-${Date.now()}`);",
+          "}",
+          "",
+          "if (!pm.environment.get('departureDate')) {",
+          "  const departureDate = new Date();",
+          "  departureDate.setDate(departureDate.getDate() + 30);",
+          "  pm.environment.set('departureDate', departureDate.toISOString().replace(/\\.\\d{3}Z$/, ''));",
+          "}",
+          "",
+          "if (!pm.environment.get('returnDate')) {",
+          "  const returnDate = new Date(pm.environment.get('departureDate'));",
+          "  returnDate.setDate(returnDate.getDate() + 4);",
+          "  pm.environment.set('returnDate', returnDate.toISOString().replace(/\\.\\d{3}Z$/, ''));",
+          "}",
+          "",
+          "function base64UrlEncode(value) {",
+          "  const wordArray = typeof value === 'string' ? CryptoJS.enc.Utf8.parse(value) : value;",
+          "  return CryptoJS.enc.Base64.stringify(wordArray)",
+          "    .replace(/=+$/, '')",
+          "    .replace(/\\+/g, '-')",
+          "    .replace(/\\//g, '_');",
+          "}",
+          "",
+          "function createJwt(subject, roles) {",
+          "  const nowSeconds = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = {",
+          "    sub: subject,",
+          "    roles: roles,",
+          "    iat: nowSeconds,",
+          "    exp: nowSeconds + 3600",
+          "  };",
+          "",
+          "  const encodedHeader = base64UrlEncode(JSON.stringify(header));",
+          "  const encodedPayload = base64UrlEncode(JSON.stringify(payload));",
+          "  const signingInput = `${encodedHeader}.${encodedPayload}`;",
+          "  const signature = CryptoJS.HmacSHA256(signingInput, pm.environment.get('jwtSecret'));",
+          "",
+          "  return `${signingInput}.${base64UrlEncode(signature)}`;",
+          "}",
+          "",
+          "pm.environment.set('adminToken', createJwt('admin', ['ADMIN']));",
+          "pm.environment.set('customerToken', createJwt('customer', ['CUSTOMER']));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Create Cruise",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shipName\": \"Disney Wish\",\n  \"departurePort\": \"Port Canaveral\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"{{departureDate}}\",\n  \"returnDate\": \"{{returnDate}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/cruises",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "cruises"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201 Created', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('response is JSON', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+              "});",
+              "",
+              "pm.test('response has cruise fields', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.shipName).to.eql('Disney Wish');",
+              "  pm.expect(json.departurePort).to.eql('Port Canaveral');",
+              "  pm.expect(json.destination).to.eql('Bahamas');",
+              "  pm.expect(json.departureDate).to.be.a('string');",
+              "  pm.expect(json.returnDate).to.be.a('string');",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const location = pm.response.headers.get('Location');",
+              "",
+              "if (json.id) {",
+              "  pm.environment.set('cruiseId', json.id);",
+              "} else if (location && !location.includes('{id}')) {",
+              "  const id = location.split('/').filter(Boolean).pop();",
+              "  if (id) {",
+              "    pm.environment.set('cruiseId', id);",
+              "  }",
+              "} else {",
+              "  console.warn('cruiseId was not auto-set because the API response does not include id yet. Set cruiseId manually before running Get Cruise by ID.');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Cruise as Customer - Forbidden",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shipName\": \"Disney Wish\",\n  \"departurePort\": \"Port Canaveral\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"{{departureDate}}\",\n  \"returnDate\": \"{{returnDate}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/cruises",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "cruises"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 403 Forbidden', function () {",
+              "  pm.response.to.have.status(403);",
+              "});",
+              "",
+              "pm.test('response has friendly forbidden error', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql('FORBIDDEN');",
+              "  pm.expect(json.message).to.eql('You do not have permission to perform this action.');",
+              "  pm.expect(json).to.have.property('timestamp');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Cruise by ID",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/cruises/{{cruiseId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "cruises",
+            "{{cruiseId}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('cruiseId is configured', function () {",
+              "  pm.expect(pm.environment.get('cruiseId')).to.not.be.oneOf([undefined, null, '', 'replace-with-created-cruise-id']);",
+              "});"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('response has cruise fields', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.have.property('shipName');",
+              "  pm.expect(json).to.have.property('departurePort');",
+              "  pm.expect(json).to.have.property('destination');",
+              "  pm.expect(json).to.have.property('departureDate');",
+              "  pm.expect(json).to.have.property('returnDate');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Cruise - Validation Error",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shipName\": \"\",\n  \"departurePort\": \"\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"2020-01-01T10:00:00\",\n  \"returnDate\": \"2020-01-05T10:00:00\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/cruises",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "cruises"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 400 Bad Request', function () {",
+              "  pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('response has error fields', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.be.an('array').that.is.not.empty;",
+              "  pm.expect(json[0]).to.have.property('code');",
+              "  pm.expect(json[0]).to.have.property('message');",
+              "  pm.expect(json[0]).to.have.property('timestamp');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: cruise-search-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - cruise-search-mongo-data:/data/db
+
+volumes:
+  cruise-search-mongo-data:
