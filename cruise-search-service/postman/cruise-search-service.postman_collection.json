@@ -90,7 +90,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"shipName\": \"Disney Wish\",\n  \"departurePort\": \"Port Canaveral\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"{{departureDate}}\",\n  \"returnDate\": \"{{returnDate}}\"\n}"
+          "raw": "{\n  \"shipName\": \"Disney Wish\",\n  \"departurePort\": \"Port Canaveral\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"{{departureDate}}\",\n  \"returnDate\": \"{{returnDate}}\",\n  \"availableCabins\": 25,\n  \"basePrice\": 1499.99,\n  \"status\": \"AVAILABLE\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/cruises",
@@ -126,6 +126,9 @@
               "  pm.expect(json.destination).to.eql('Bahamas');",
               "  pm.expect(json.departureDate).to.be.a('string');",
               "  pm.expect(json.returnDate).to.be.a('string');",
+              "  pm.expect(json.availableCabins).to.eql(25);",
+              "  pm.expect(json.basePrice).to.eql(1499.99);",
+              "  pm.expect(json.status).to.eql('AVAILABLE');",
               "});",
               "",
               "const json = pm.response.json();",
@@ -176,7 +179,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"shipName\": \"Disney Wish\",\n  \"departurePort\": \"Port Canaveral\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"{{departureDate}}\",\n  \"returnDate\": \"{{returnDate}}\"\n}"
+          "raw": "{\n  \"shipName\": \"Disney Wish\",\n  \"departurePort\": \"Port Canaveral\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"{{departureDate}}\",\n  \"returnDate\": \"{{returnDate}}\",\n  \"availableCabins\": 25,\n  \"basePrice\": 1499.99,\n  \"status\": \"AVAILABLE\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/cruises",
@@ -278,6 +281,86 @@
               "  pm.expect(json).to.have.property('destination');",
               "  pm.expect(json).to.have.property('departureDate');",
               "  pm.expect(json).to.have.property('returnDate');",
+              "  pm.expect(json).to.have.property('availableCabins');",
+              "  pm.expect(json).to.have.property('basePrice');",
+              "  pm.expect(json).to.have.property('status');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Cruises",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/cruises?page={{page}}&size={{size}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "cruises"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "{{page}}"
+            },
+            {
+              "key": "size",
+              "value": "{{size}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('response is an array', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.be.an('array');",
+              "});",
+              "",
+              "pm.test('cruises have expected shape when present', function () {",
+              "  const json = pm.response.json();",
+              "  if (json.length > 0) {",
+              "    pm.expect(json[0]).to.have.property('id');",
+              "    pm.expect(json[0]).to.have.property('shipName');",
+              "    pm.expect(json[0]).to.have.property('departurePort');",
+              "    pm.expect(json[0]).to.have.property('destination');",
+              "    pm.expect(json[0]).to.have.property('departureDate');",
+              "    pm.expect(json[0]).to.have.property('returnDate');",
+              "    pm.expect(json[0]).to.have.property('availableCabins');",
+              "    pm.expect(json[0]).to.have.property('basePrice');",
+              "    pm.expect(json[0]).to.have.property('status');",
+              "  }",
               "});"
             ]
           }
@@ -310,7 +393,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"shipName\": \"\",\n  \"departurePort\": \"\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"2020-01-01T10:00:00\",\n  \"returnDate\": \"2020-01-05T10:00:00\"\n}"
+          "raw": "{\n  \"shipName\": \"\",\n  \"departurePort\": \"\",\n  \"destination\": \"Bahamas\",\n  \"departureDate\": \"2020-01-01T10:00:00\",\n  \"returnDate\": \"2020-01-05T10:00:00\",\n  \"availableCabins\": -1,\n  \"basePrice\": 0,\n  \"status\": \"\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/cruises",

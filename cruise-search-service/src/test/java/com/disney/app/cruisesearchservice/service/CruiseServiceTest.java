@@ -23,6 +23,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -65,7 +66,10 @@ class CruiseServiceTest {
                 request.departurePort(),
                 request.destination(),
                 request.departureDate(),
-                request.returnDate()
+                request.returnDate(),
+                request.availableCabins(),
+                request.basePrice(),
+                request.status()
         ));
     }
 
@@ -195,7 +199,10 @@ class CruiseServiceTest {
                 "Port Canaveral",
                 "Bahamas",
                 DEPARTURE_DATE,
-                RETURN_DATE
+                RETURN_DATE,
+                25,
+                new BigDecimal("1499.99"),
+                "AVAILABLE"
         );
     }
 
@@ -206,7 +213,10 @@ class CruiseServiceTest {
                 request.departurePort(),
                 request.destination(),
                 request.departureDate(),
-                request.returnDate()
+                request.returnDate(),
+                request.availableCabins(),
+                request.basePrice(),
+                request.status()
         );
     }
 
@@ -217,7 +227,10 @@ class CruiseServiceTest {
                 entity.departurePort(),
                 entity.destination(),
                 entity.departureDate(),
-                entity.returnDate()
+                entity.returnDate(),
+                entity.availableCabins(),
+                entity.basePrice(),
+                entity.status()
         );
     }
 
@@ -236,7 +249,10 @@ class CruiseServiceTest {
                     cruiseRequest.departurePort(),
                     cruiseRequest.destination(),
                     cruiseRequest.departureDate(),
-                    cruiseRequest.returnDate()
+                    cruiseRequest.returnDate(),
+                    cruiseRequest.availableCabins(),
+                    cruiseRequest.basePrice(),
+                    cruiseRequest.status()
             );
         }
     }

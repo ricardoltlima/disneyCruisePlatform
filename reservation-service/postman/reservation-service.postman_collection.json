@@ -1,0 +1,294 @@
+{
+  "info": {
+    "_postman_id": "777d1415-ff3f-45cf-879a-0123f12e5305",
+    "name": "Reservation Service",
+    "description": "Basic requests and tests for Reservation Service integration with Cruise Search Service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('correlationId')) {",
+          "  pm.environment.set('correlationId', `reservation-${Date.now()}`);",
+          "}",
+          "",
+          "if (!pm.environment.get('guestId')) {",
+          "  pm.environment.set('guestId', `guest-${Date.now()}`);",
+          "}",
+          "",
+          "if (!pm.environment.get('guestName')) {",
+          "  pm.environment.set('guestName', 'Ricardo Lima');",
+          "}",
+          "",
+          "if (!pm.environment.get('numberOfGuests')) {",
+          "  pm.environment.set('numberOfGuests', '2');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Create Reservation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cruiseId\": \"{{cruiseId}}\",\n  \"guestId\": \"{{guestId}}\",\n  \"guestName\": \"{{guestName}}\",\n  \"numberOfGuests\": {{numberOfGuests}}\n}"
+        },
+        "url": {
+          "raw": "{{reservationBaseUrl}}/api/v1/reservations",
+          "host": [
+            "{{reservationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "reservations"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('cruiseId is configured', function () {",
+              "  pm.expect(pm.environment.get('cruiseId')).to.not.be.oneOf([undefined, null, '', 'replace-with-created-cruise-id']);",
+              "});"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201 Created', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('response is JSON', function () {",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+              "});",
+              "",
+              "pm.test('response has reservation fields', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.have.property('id');",
+              "  pm.expect(json.cruiseId).to.eql(pm.environment.get('cruiseId'));",
+              "  pm.expect(json.guestId).to.eql(pm.environment.get('guestId'));",
+              "  pm.expect(json.guestName).to.eql(pm.environment.get('guestName'));",
+              "  pm.expect(json.numberOfGuests).to.eql(Number(pm.environment.get('numberOfGuests')));",
+              "  pm.expect(json.status).to.eql('PENDING_PAYMENT');",
+              "  pm.expect(json.totalPrice).to.be.a('number');",
+              "  pm.expect(json).to.have.property('createdAt');",
+              "  pm.expect(json).to.have.property('updatedAt');",
+              "});",
+              "",
+              "pm.test('correlation id is returned', function () {",
+              "  pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql(pm.environment.get('correlationId'));",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "if (json.id) {",
+              "  pm.environment.set('reservationId', json.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Reservation by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{reservationBaseUrl}}/api/v1/reservations/{{reservationId}}",
+          "host": [
+            "{{reservationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "reservations",
+            "{{reservationId}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('reservationId is configured', function () {",
+              "  pm.expect(pm.environment.get('reservationId')).to.not.be.oneOf([undefined, null, '', 'replace-with-created-reservation-id']);",
+              "});"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('response has reservation fields', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.id).to.eql(pm.environment.get('reservationId'));",
+              "  pm.expect(json.cruiseId).to.eql(pm.environment.get('cruiseId'));",
+              "  pm.expect(json.status).to.eql('PENDING_PAYMENT');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Reservation - Validation Error",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cruiseId\": \"\",\n  \"guestId\": \"\",\n  \"guestName\": \"\",\n  \"numberOfGuests\": 0\n}"
+        },
+        "url": {
+          "raw": "{{reservationBaseUrl}}/api/v1/reservations",
+          "host": [
+            "{{reservationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "reservations"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 400 Bad Request', function () {",
+              "  pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('response has validation errors', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.be.an('array').that.is.not.empty;",
+              "  pm.expect(json[0]).to.have.property('code');",
+              "  pm.expect(json[0]).to.have.property('message');",
+              "  pm.expect(json[0]).to.have.property('timestamp');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Reservation - Cruise Unavailable",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cruiseId\": \"missing-cruise-id\",\n  \"guestId\": \"{{guestId}}\",\n  \"guestName\": \"{{guestName}}\",\n  \"numberOfGuests\": 2\n}"
+        },
+        "url": {
+          "raw": "{{reservationBaseUrl}}/api/v1/reservations",
+          "host": [
+            "{{reservationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "reservations"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 409 Conflict', function () {",
+              "  pm.response.to.have.status(409);",
+              "});",
+              "",
+              "pm.test('response has cruise unavailable error', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql('CRUISE_UNAVAILABLE');",
+              "  pm.expect(json).to.have.property('message');",
+              "  pm.expect(json).to.have.property('timestamp');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
