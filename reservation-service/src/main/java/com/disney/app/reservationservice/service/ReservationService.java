@@ -5,9 +5,11 @@ import com.disney.app.reservationservice.dto.ReservationResponse;
 import com.disney.app.reservationservice.entity.ReservationEntity;
 import com.disney.app.reservationservice.entity.ReservationStatus;
 import com.disney.app.reservationservice.error.CruiseUnavailableException;
+import com.disney.app.reservationservice.event.ReservationCreatedEvent;
 import com.disney.app.reservationservice.error.ReservationNotFoundException;
 import com.disney.app.reservationservice.error.ReservationPersistenceException;
 import com.disney.app.reservationservice.mapper.ReservationMapper;
+import com.disney.app.reservationservice.messaging.ReservationCreatedEventPublisher;
 import com.disney.app.reservationservice.repository.ReservationRepository;
 import com.disney.app.reservationservice.client.CruiseSearchClient;
 import com.disney.app.reservationservice.client.CruiseSearchResponse;
@@ -22,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class ReservationService {
@@ -31,17 +34,20 @@ public class ReservationService {
     private final ReservationRepository repository;
     private final ReservationMapper mapper;
     private final CruiseSearchClient cruiseSearchClient;
+    private final ReservationCreatedEventPublisher eventPublisher;
     private final Retry mongoRetry;
 
     public ReservationService(
             ReservationRepository repository,
             ReservationMapper mapper,
             CruiseSearchClient cruiseSearchClient,
+            ReservationCreatedEventPublisher eventPublisher,
             @Qualifier("mongoRetry") Retry mongoRetry
     ) {
         this.repository = repository;
         this.mapper = mapper;
         this.cruiseSearchClient = cruiseSearchClient;
+        this.eventPublisher = eventPublisher;
         this.mongoRetry = mongoRetry;
     }
 
@@ -58,6 +64,8 @@ public class ReservationService {
                 .flatMap(entity -> repository.save(entity)
                         .transformDeferred(RetryOperator.of(mongoRetry)))
                 .map(mapper::toReservationResponse)
+                .flatMap(response -> eventPublisher.publish(toReservationCreatedEvent(response))
+                        .thenReturn(response))
                 .doOnNext(response -> log.info("reservation_created reservationId={} cruiseId={} guestId={} status={} totalPrice={}",
                         response.id(),
                         response.cruiseId(),
@@ -108,6 +116,18 @@ public class ReservationService {
                 ReservationStatus.PENDING_PAYMENT,
                 now,
                 now
+        );
+    }
+
+    private ReservationCreatedEvent toReservationCreatedEvent(ReservationResponse response) {
+        return new ReservationCreatedEvent(
+                UUID.randomUUID().toString(),
+                response.id(),
+                response.cruiseId(),
+                response.guestId(),
+                response.totalPrice(),
+                LocalDateTime.now(),
+                1
         );
     }
 }

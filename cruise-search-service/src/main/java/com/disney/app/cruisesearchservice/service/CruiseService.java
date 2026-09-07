@@ -110,6 +110,7 @@ public class CruiseService {
         return repository.findAllBy(pageable)
                 .transformDeferred(RetryOperator.of(mongoRetry))
                 .map(mapper::toCruiseResponse)
+                .doOnNext(cruiseResponse -> log.info("Response: {}", cruiseResponse))
                 .doOnComplete(() -> log.info("cruise_search_completed page={} size={}",
                         pageable.getPageNumber(),
                         pageable.getPageSize()))
