@@ -30,6 +30,31 @@ services:
       - PLAINTEXT://localhost:9092
     ports:
       - "9092:9092"
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: disney-cruise-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - mongo
+      - redpanda
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: disney-cruise-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
 
 volumes:
   mongo-data:
+  grafana-data:

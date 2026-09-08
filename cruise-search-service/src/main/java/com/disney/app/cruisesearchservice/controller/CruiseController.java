@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,10 +32,9 @@ public class CruiseController {
 
     @PostMapping
     public Mono<ResponseEntity<CruiseResponse>> addCruise(
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody CruiseRequest request
     ) {
-        return service.addCruise(request, idempotencyKey)
+        return service.addCruise(request)
                 .map(cruiseCreated -> ResponseEntity.created(URI.create("/api/v1/cruises/" + cruiseCreated.id())).body(cruiseCreated));
     }
 

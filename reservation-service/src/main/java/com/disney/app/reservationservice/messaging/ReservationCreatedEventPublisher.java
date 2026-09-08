@@ -1,6 +1,8 @@
 package com.disney.app.reservationservice.messaging;
 
 import com.disney.app.reservationservice.event.ReservationCreatedEvent;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
@@ -22,14 +24,17 @@ public class ReservationCreatedEventPublisher {
 
     private final KafkaSender<String, String> kafkaSender;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
     private final String topic;
 
     public ReservationCreatedEventPublisher(
             ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
             @Value("${app.kafka.bootstrap-servers}") String bootstrapServers,
             @Value("${app.kafka.topics.reservation-created}") String topic
     ) {
         this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
         this.topic = topic;
         this.kafkaSender = KafkaSender.create(SenderOptions.create(Map.of(
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
@@ -40,6 +45,8 @@ public class ReservationCreatedEventPublisher {
     }
 
     public Mono<Void> publish(ReservationCreatedEvent event) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+
         return Mono.fromCallable(() -> toJson(event))
                 .flatMap(payload -> kafkaSender.send(Mono.just(SenderRecord.create(
                                 topic,
@@ -56,6 +63,14 @@ public class ReservationCreatedEventPublisher {
                         topic,
                         result.recordMetadata().partition(),
                         result.recordMetadata().offset()))
+                .doOnNext(result -> {
+                    meterRegistry.counter("reservation.event.published", "topic", topic, "outcome", "success").increment();
+                    sample.stop(meterRegistry.timer("reservation.event.publish.duration", "topic", topic, "outcome", "success"));
+                })
+                .doOnError(error -> {
+                    meterRegistry.counter("reservation.event.published", "topic", topic, "outcome", error.getClass().getSimpleName()).increment();
+                    sample.stop(meterRegistry.timer("reservation.event.publish.duration", "topic", topic, "outcome", "error"));
+                })
                 .then();
     }
 

@@ -52,28 +52,6 @@ public class GlobalExceptionHandler {
         return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(error));
     }
 
-    @ExceptionHandler(IdempotencyKeyConflictException.class)
-    public Mono<ResponseEntity<ErrorResponse>> handleIdempotencyKeyConflict(IdempotencyKeyConflictException ex) {
-        ErrorResponse error = new ErrorResponse(
-                "IDEMPOTENCY_KEY_CONFLICT",
-                ex.getMessage(),
-                LocalDateTime.now()
-        );
-
-        return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(error));
-    }
-
-    @ExceptionHandler(InvalidIdempotencyKeyException.class)
-    public Mono<ResponseEntity<ErrorResponse>> handleInvalidIdempotencyKey(InvalidIdempotencyKeyException ex) {
-        ErrorResponse error = new ErrorResponse(
-                "INVALID_IDEMPOTENCY_KEY",
-                ex.getMessage(),
-                LocalDateTime.now()
-        );
-
-        return Mono.just(ResponseEntity.badRequest().body(error));
-    }
-
     @ExceptionHandler(CruiseNotFoundException.class)
     public Mono<ResponseEntity<ErrorResponse>> handleCruiseNotFound(CruiseNotFoundException ex) {
         ErrorResponse error = new ErrorResponse(

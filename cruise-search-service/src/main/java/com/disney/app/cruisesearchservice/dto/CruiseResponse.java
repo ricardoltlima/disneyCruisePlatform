@@ -1,5 +1,7 @@
 package com.disney.app.cruisesearchservice.dto;
 
+import com.disney.app.cruisesearchservice.model.CruiseStatus;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -13,6 +15,6 @@ public record CruiseResponse(
         LocalDateTime returnDate,
         Integer availableCabins,
         BigDecimal basePrice,
-        String status
+        CruiseStatus status
 ) {
 }

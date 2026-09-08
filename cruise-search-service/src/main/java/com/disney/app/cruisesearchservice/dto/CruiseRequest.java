@@ -1,5 +1,6 @@
 package com.disney.app.cruisesearchservice.dto;
 
+import com.disney.app.cruisesearchservice.model.CruiseStatus;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -29,7 +30,7 @@ public record CruiseRequest(
         @NotNull(message = "Base price is mandatory")
         @DecimalMin(value = "0.0", inclusive = false, message = "Base price must be greater than zero")
         BigDecimal basePrice,
-        @NotBlank(message = "Status is mandatory")
-        String status
+        @NotNull(message = "Status is mandatory")
+        CruiseStatus status
 ) {
 }

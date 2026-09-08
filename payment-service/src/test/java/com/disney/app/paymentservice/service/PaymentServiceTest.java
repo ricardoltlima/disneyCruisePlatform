@@ -7,6 +7,7 @@ import com.disney.app.paymentservice.entity.PaymentStatus;
 import com.disney.app.paymentservice.error.PaymentNotFoundException;
 import com.disney.app.paymentservice.error.PaymentPersistenceException;
 import com.disney.app.paymentservice.repository.PaymentRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -28,7 +29,7 @@ class PaymentServiceTest {
     @BeforeEach
     void setUp() {
         paymentRepository = mock(PaymentRepository.class);
-        paymentService = new PaymentService(paymentRepository);
+        paymentService = new PaymentService(paymentRepository, new SimpleMeterRegistry());
     }
 
     @Test

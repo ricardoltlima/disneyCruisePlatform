@@ -1,5 +1,6 @@
 package com.disney.app.cruisesearchservice.entity;
 
+import com.disney.app.cruisesearchservice.model.CruiseStatus;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -23,6 +24,6 @@ public record CruiseEntity(
         LocalDateTime returnDate,
         Integer availableCabins,
         BigDecimal basePrice,
-        String status
+        CruiseStatus status
 ) {
 }

@@ -1,7 +1,6 @@
 package com.disney.app.cruisesearchservice.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -12,13 +11,12 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class RequestLoggingFilter implements WebFilter {
 
     public static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
     public static final String CORRELATION_ID_CONTEXT_KEY = "correlationId";
-
-    private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -29,17 +27,17 @@ public class RequestLoggingFilter implements WebFilter {
 
         return chain.filter(exchange)
                 .doOnSubscribe(subscription -> withCorrelationId(correlationId, () ->
-                        log.info("request_started method={} path={}",
+                        log.info("Incoming request started. method={} path={}",
                                 exchange.getRequest().getMethod(),
                                 exchange.getRequest().getPath().value())))
                 .doOnSuccess(ignored -> withCorrelationId(correlationId, () ->
-                        log.info("request_completed method={} path={} status={} durationMs={}",
+                        log.info("Request completed successfully. method={} path={} status={} durationMs={}",
                                 exchange.getRequest().getMethod(),
                                 exchange.getRequest().getPath().value(),
                                 exchange.getResponse().getStatusCode(),
                                 elapsedMillis(startNanos))))
                 .doOnError(error -> withCorrelationId(correlationId, () ->
-                        log.warn("request_failed method={} path={} durationMs={} error={}",
+                        log.warn("Request failed. method={} path={} durationMs={} error={}",
                                 exchange.getRequest().getMethod(),
                                 exchange.getRequest().getPath().value(),
                                 elapsedMillis(startNanos),

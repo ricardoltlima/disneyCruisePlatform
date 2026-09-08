@@ -15,6 +15,8 @@ import com.disney.app.reservationservice.client.CruiseSearchClient;
 import com.disney.app.reservationservice.client.CruiseSearchResponse;
 import io.github.resilience4j.reactor.retry.RetryOperator;
 import io.github.resilience4j.retry.Retry;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.slf4j.Logger;
@@ -36,22 +38,27 @@ public class ReservationService {
     private final CruiseSearchClient cruiseSearchClient;
     private final ReservationCreatedEventPublisher eventPublisher;
     private final Retry mongoRetry;
+    private final MeterRegistry meterRegistry;
 
     public ReservationService(
             ReservationRepository repository,
             ReservationMapper mapper,
             CruiseSearchClient cruiseSearchClient,
             ReservationCreatedEventPublisher eventPublisher,
-            @Qualifier("mongoRetry") Retry mongoRetry
+            @Qualifier("mongoRetry") Retry mongoRetry,
+            MeterRegistry meterRegistry
     ) {
         this.repository = repository;
         this.mapper = mapper;
         this.cruiseSearchClient = cruiseSearchClient;
         this.eventPublisher = eventPublisher;
         this.mongoRetry = mongoRetry;
+        this.meterRegistry = meterRegistry;
     }
 
     public Mono<ReservationResponse> createReservation(ReservationRequest request) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+
         log.info("reservation_create_requested cruiseId={} guestId={} numberOfGuests={}",
                 request.cruiseId(),
                 request.guestId(),
@@ -72,15 +79,25 @@ public class ReservationService {
                         response.guestId(),
                         response.status(),
                         response.totalPrice()))
+                .doOnNext(response -> {
+                    meterRegistry.counter("reservation.created", "status", response.status().name()).increment();
+                    sample.stop(meterRegistry.timer("reservation.create.duration", "outcome", "success"));
+                })
                 .doOnError(error -> log.warn("reservation_create_failed cruiseId={} guestId={} error={}",
                         request.cruiseId(),
                         request.guestId(),
                         error.getClass().getSimpleName()))
+                .doOnError(error -> {
+                    meterRegistry.counter("reservation.create.failed", "error", error.getClass().getSimpleName()).increment();
+                    sample.stop(meterRegistry.timer("reservation.create.duration", "outcome", "error"));
+                })
                 .onErrorMap(DataAccessException.class,
                         ex -> new ReservationPersistenceException("Unable to save reservation"));
     }
 
     public Mono<ReservationResponse> getReservation(String id) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+
         log.info("reservation_lookup_requested reservationId={}", id);
         return repository.findById(id)
                 .transformDeferred(RetryOperator.of(mongoRetry))
@@ -89,9 +106,17 @@ public class ReservationService {
                 .doOnNext(response -> log.info("reservation_lookup_succeeded reservationId={} status={}",
                         response.id(),
                         response.status()))
+                .doOnNext(response -> {
+                    meterRegistry.counter("reservation.lookup.completed", "outcome", "found").increment();
+                    sample.stop(meterRegistry.timer("reservation.lookup.duration", "outcome", "found"));
+                })
                 .doOnError(error -> log.warn("reservation_lookup_failed reservationId={} error={}",
                         id,
                         error.getClass().getSimpleName()))
+                .doOnError(error -> {
+                    meterRegistry.counter("reservation.lookup.completed", "outcome", error.getClass().getSimpleName()).increment();
+                    sample.stop(meterRegistry.timer("reservation.lookup.duration", "outcome", "error"));
+                })
                 .onErrorMap(DataAccessException.class,
                         ex -> new ReservationPersistenceException("Unable to find reservation"));
     }

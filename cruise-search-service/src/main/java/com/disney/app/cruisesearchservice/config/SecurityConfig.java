@@ -39,6 +39,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeExchange(exchange -> exchange
+                        .pathMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/cruises").hasRole("ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/v1/cruises/**").hasAnyRole("CUSTOMER", "ADMIN")
                         .anyExchange().authenticated()
