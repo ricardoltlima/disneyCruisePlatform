@@ -7,27 +7,22 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import io.github.resilience4j.reactor.retry.RetryOperator;
 import io.github.resilience4j.retry.Retry;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.concurrent.TimeoutException;
 
+@Slf4j
 @Component
 public class CruiseSearchClient {
-
-    private static final Logger log = LoggerFactory.getLogger(CruiseSearchClient.class);
 
     private final WebClient webClient;
     private final String bearerToken;
@@ -54,7 +49,7 @@ public class CruiseSearchClient {
         return Mono.deferContextual(context -> {
             String correlationId = context.getOrDefault(RequestLoggingFilter.CORRELATION_ID_CONTEXT_KEY, null);
 
-            log.info("cruise_search_client_lookup_requested cruiseId={}", cruiseId);
+            log.info("Looking up cruise {} in Cruise Search Service", cruiseId);
 
             return webClient.get()
                     .uri("/api/v1/cruises/{id}", cruiseId)
@@ -64,42 +59,29 @@ public class CruiseSearchClient {
                     })
                     .exchangeToMono(response -> {
                         if (response.statusCode().equals(HttpStatus.NOT_FOUND)) {
-                            log.info("cruise_search_client_lookup_not_found cruiseId={}", cruiseId);
+                            log.info("Cruise Search Service did not find cruise {}", cruiseId);
                             return Mono.empty();
                         }
 
-                    if (isRetryableStatus(response.statusCode())) {
-                        return response.createException()
-                                .flatMap(ex -> Mono.error(new TransientCruiseSearchServiceException(
-                                        "Cruise Search Service request failed with status: " + response.statusCode()
-                                )));
-                    }
+                        if (isRetryableStatus(response.statusCode())) {
+                            return response.createException()
+                                    .flatMap(ex -> Mono.error(new TransientCruiseSearchServiceException(
+                                            "Cruise Search Service is temporarily unavailable. Status: " + response.statusCode())));
+                        }
 
-                    if (response.statusCode().isError()) {
-                        return response.createException()
-                                .flatMap(ex -> Mono.error(new CruiseSearchServiceException(
-                                        "Cruise Search Service rejected Reservation Service request with status: " + response.statusCode()
-                                )));
-                    }
+                        if (response.statusCode().isError()) {
+                            return response.createException()
+                                    .flatMap(ex -> Mono.error(new CruiseSearchServiceException(
+                                            "Cruise Search Service could not process the request. Status: " + response.statusCode())));
+                        }
 
                         return response.bodyToMono(CruiseSearchResponse.class);
                     })
-                    .doOnNext(response -> log.info("cruise_search_client_lookup_succeeded cruiseId={} status={} availableCabins={}",
-                            response.id(),
-                            response.status(),
-                            response.availableCabins()))
-                    .onErrorMap(WebClientRequestException.class,
-                            ex -> new TransientCruiseSearchServiceException("Cruise Search Service is unavailable"))
+                    .doOnNext(response -> log.info("Cruise {} found with status {} and {} available cabins", response.id(), response.status(), response.availableCabins()))
                     .timeout(timeout)
-                    .onErrorMap(TimeoutException.class,
-                            ex -> new TransientCruiseSearchServiceException("Cruise Search Service timed out"))
-                    .onErrorMap(WebClientResponseException.class,
-                            ex -> new CruiseSearchServiceException("Cruise Search Service rejected Reservation Service request"))
                     .transformDeferred(CircuitBreakerOperator.of(cruiseSearchCircuitBreaker))
                     .transformDeferred(RetryOperator.of(cruiseSearchRetry))
-                    .doOnError(error -> log.warn("cruise_search_client_lookup_failed cruiseId={} error={}",
-                            cruiseId,
-                            error.getClass().getSimpleName()));
+                    .doOnError(error -> log.warn("Could not look up cruise {} in Cruise Search Service: {}", cruiseId, error.getClass().getSimpleName()));
         });
     }
 
@@ -110,13 +92,13 @@ public class CruiseSearchClient {
     }
 
     private void addAuthorizationHeader(HttpHeaders headers, String token) {
-        if (StringUtils.hasText(token)) {
+        if (StringUtils.isNotBlank(token)) {
             headers.setBearerAuth(token);
         }
     }
 
     private void addCorrelationHeader(HttpHeaders headers, String correlationId) {
-        if (StringUtils.hasText(correlationId)) {
+        if (StringUtils.isNotBlank(correlationId)) {
             headers.set(RequestLoggingFilter.CORRELATION_ID_HEADER, correlationId);
         }
     }
