@@ -4,10 +4,11 @@ import com.disney.app.paymentservice.entity.PaymentEntity;
 import com.disney.app.paymentservice.entity.PaymentStatus;
 import com.disney.app.paymentservice.error.PaymentPersistenceException;
 import com.disney.app.paymentservice.event.ReservationCreatedEvent;
+import com.disney.app.paymentservice.mapper.PaymentMapper;
 import com.disney.app.paymentservice.repository.PaymentRepository;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.springframework.dao.DataAccessResourceFailureException;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -30,7 +31,10 @@ class PaymentServiceTest {
     @BeforeEach
     void setUp() {
         paymentRepository = mock(PaymentRepository.class);
-        paymentService = new PaymentService(paymentRepository, new SimpleMeterRegistry());
+        paymentService = new PaymentService(
+                paymentRepository,
+                Mappers.getMapper(PaymentMapper.class)
+        );
     }
 
     @Test

@@ -5,11 +5,10 @@ import com.disney.app.paymentservice.event.ReservationCreatedEvent;
 import com.disney.app.paymentservice.service.PaymentService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -19,10 +18,9 @@ import reactor.kafka.receiver.ReceiverOptions;
 import java.util.Collections;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class ReservationCreatedEventConsumer {
-
-    private static final Logger log = LoggerFactory.getLogger(ReservationCreatedEventConsumer.class);
 
     private final KafkaReceiver<String, byte[]> kafkaReceiver;
     private final ReservationCreatedEventAvroDeserializer avroDeserializer;
@@ -55,13 +53,18 @@ public class ReservationCreatedEventConsumer {
         subscription = kafkaReceiver.receive()
                 .concatMap(record -> toEvent(record.value())
                         .flatMap(paymentService::createPaymentFromReservation)
-                        .doOnNext(payment -> log.info("reservation_created_event_processed reservationId={} paymentId={} status={}", payment.reservationId(), payment.id(),payment.status()))
+                        .doOnNext(payment -> log.info("Reservation-created event processed. reservationId={} paymentId={} status={}",
+                                payment.reservationId(),
+                                payment.id(),
+                                payment.status()))
                         .then(Mono.fromRunnable(record.receiverOffset()::acknowledge))
                         .onErrorResume(error -> {
-                            log.warn("reservation_created_event_processing_failed offset={} error={}", record.receiverOffset().offset(), error.getClass().getSimpleName());
+                            log.warn("Could not process reservation-created event. offset={} error={}",
+                                    record.receiverOffset().offset(),
+                                    error.getClass().getSimpleName());
                             return Mono.empty();
                         }))
-                .doOnError(error -> log.error("reservation_created_consumer_failed error={}", error.getClass().getSimpleName(), error))
+                .doOnError(error -> log.error("Reservation-created event consumer stopped unexpectedly. error={}", error.getClass().getSimpleName(), error))
                 .subscribe();
     }
 
