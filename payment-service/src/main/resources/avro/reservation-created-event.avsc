@@ -1,0 +1,37 @@
+{
+  "type": "record",
+  "name": "ReservationCreatedEvent",
+  "namespace": "com.disney.app.reservationservice.event",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "reservationId",
+      "type": "string"
+    },
+    {
+      "name": "cruiseId",
+      "type": "string"
+    },
+    {
+      "name": "guestId",
+      "type": "string"
+    },
+    {
+      "name": "amount",
+      "type": "string",
+      "doc": "Decimal amount represented as a string to avoid floating point precision loss."
+    },
+    {
+      "name": "occurredAt",
+      "type": "string",
+      "doc": "ISO-8601 local date-time."
+    },
+    {
+      "name": "version",
+      "type": "int"
+    }
+  ]
+}

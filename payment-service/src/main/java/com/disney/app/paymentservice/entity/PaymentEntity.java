@@ -12,7 +12,7 @@ public record PaymentEntity(
         @Id
         String id,
 
-        @Indexed
+        @Indexed(unique = true)
         String reservationId,
 
         BigDecimal amount,

@@ -1,11 +1,9 @@
 package com.disney.app.paymentservice.service;
 
-import com.disney.app.paymentservice.dto.PaymentRequest;
-import com.disney.app.paymentservice.dto.PaymentResponse;
 import com.disney.app.paymentservice.entity.PaymentEntity;
 import com.disney.app.paymentservice.entity.PaymentStatus;
-import com.disney.app.paymentservice.error.PaymentNotFoundException;
 import com.disney.app.paymentservice.error.PaymentPersistenceException;
+import com.disney.app.paymentservice.event.ReservationCreatedEvent;
 import com.disney.app.paymentservice.repository.PaymentRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,8 +15,11 @@ import reactor.test.StepVerifier;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PaymentServiceTest {
@@ -33,63 +34,81 @@ class PaymentServiceTest {
     }
 
     @Test
-    void createPaymentCompletesPaymentForValidPaymentToken() {
-        PaymentRequest request = new PaymentRequest("reservation-1", new BigDecimal("2999.98"), "valid-token");
-        PaymentEntity savedEntity = paymentEntity("payment-1", request.reservationId(), request.amount(), PaymentStatus.COMPLETED);
+    void createPaymentFromReservationCreatesCompletedPayment() {
+        ReservationCreatedEvent event = reservationCreatedEvent();
+        PaymentEntity savedEntity = paymentEntity("payment-1", event.reservationId(), event.amount(), PaymentStatus.COMPLETED);
 
+        when(paymentRepository.findFirstByReservationId(event.reservationId())).thenReturn(Mono.empty());
         when(paymentRepository.save(any(PaymentEntity.class))).thenReturn(Mono.just(savedEntity));
 
-        StepVerifier.create(paymentService.createPayment(request))
-                .expectNext(paymentResponse(savedEntity))
+        StepVerifier.create(paymentService.createPaymentFromReservation(event))
+                .expectNext(savedEntity)
                 .verifyComplete();
+
+        verify(paymentRepository).save(any(PaymentEntity.class));
     }
 
     @Test
-    void createPaymentFailsPaymentWhenTokenIsFail() {
-        PaymentRequest request = new PaymentRequest("reservation-1", new BigDecimal("2999.98"), "fail");
-        PaymentEntity savedEntity = paymentEntity("payment-1", request.reservationId(), request.amount(), PaymentStatus.FAILED);
+    void createPaymentFromReservationReturnsExistingPaymentForDuplicateReservation() {
+        ReservationCreatedEvent event = reservationCreatedEvent();
+        PaymentEntity existingEntity = paymentEntity("payment-1", event.reservationId(), event.amount(), PaymentStatus.COMPLETED);
 
-        when(paymentRepository.save(any(PaymentEntity.class))).thenReturn(Mono.just(savedEntity));
+        when(paymentRepository.findFirstByReservationId(event.reservationId())).thenReturn(Mono.just(existingEntity));
 
-        StepVerifier.create(paymentService.createPayment(request))
-                .expectNext(paymentResponse(savedEntity))
+        StepVerifier.create(paymentService.createPaymentFromReservation(event))
+                .expectNext(existingEntity)
                 .verifyComplete();
+
+        verify(paymentRepository, never()).save(any());
     }
 
     @Test
-    void createPaymentMapsPersistenceFailure() {
-        PaymentRequest request = new PaymentRequest("reservation-1", new BigDecimal("2999.98"), "valid-token");
+    void createPaymentFromReservationMapsPersistenceFailure() {
+        ReservationCreatedEvent event = reservationCreatedEvent();
 
+        when(paymentRepository.findFirstByReservationId(event.reservationId())).thenReturn(Mono.empty());
         when(paymentRepository.save(any(PaymentEntity.class)))
                 .thenReturn(Mono.error(new DataAccessResourceFailureException("Mongo unavailable")));
 
-        StepVerifier.create(paymentService.createPayment(request))
+        StepVerifier.create(paymentService.createPaymentFromReservation(event))
                 .expectError(PaymentPersistenceException.class)
                 .verify();
     }
 
     @Test
-    void getPaymentReturnsPaymentWhenFound() {
-        PaymentEntity entity = paymentEntity("payment-1", "reservation-1", new BigDecimal("2999.98"), PaymentStatus.COMPLETED);
+    void createPaymentFromReservationBuildsEntityFromReservationEvent() {
+        ReservationCreatedEvent event = reservationCreatedEvent();
 
-        when(paymentRepository.findById("payment-1")).thenReturn(Mono.just(entity));
+        when(paymentRepository.findFirstByReservationId(event.reservationId())).thenReturn(Mono.empty());
+        when(paymentRepository.save(any(PaymentEntity.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
 
-        StepVerifier.create(paymentService.getPayment("payment-1"))
-                .expectNext(paymentResponse(entity))
+        StepVerifier.create(paymentService.createPaymentFromReservation(event))
+                .assertNext(payment -> {
+                    assertThat(payment.id()).isNull();
+                    assertThat(payment.reservationId()).isEqualTo(event.reservationId());
+                    assertThat(payment.amount()).isEqualByComparingTo(event.amount());
+                    assertThat(payment.status()).isEqualTo(PaymentStatus.COMPLETED);
+                    assertThat(payment.providerReference()).isNotBlank();
+                    assertThat(payment.createdAt()).isNotNull();
+                    assertThat(payment.updatedAt()).isNotNull();
+                })
                 .verifyComplete();
     }
 
-    @Test
-    void getPaymentReturnsNotFoundWhenMissing() {
-        when(paymentRepository.findById("missing-payment")).thenReturn(Mono.empty());
-
-        StepVerifier.create(paymentService.getPayment("missing-payment"))
-                .expectError(PaymentNotFoundException.class)
-                .verify();
+    private static ReservationCreatedEvent reservationCreatedEvent() {
+        return new ReservationCreatedEvent(
+                "event-1",
+                "reservation-1",
+                "cruise-1",
+                "guest-1",
+                new BigDecimal("2999.98"),
+                LocalDateTime.of(2026, 9, 12, 10, 30),
+                1
+        );
     }
 
     private static PaymentEntity paymentEntity(String id, String reservationId, BigDecimal amount, PaymentStatus status) {
-        LocalDateTime now = LocalDateTime.of(2026, 9, 7, 8, 0);
+        LocalDateTime now = LocalDateTime.of(2026, 9, 12, 10, 35);
         return new PaymentEntity(
                 id,
                 reservationId,
@@ -98,18 +117,6 @@ class PaymentServiceTest {
                 "provider-reference-1",
                 now,
                 now
-        );
-    }
-
-    private static PaymentResponse paymentResponse(PaymentEntity entity) {
-        return new PaymentResponse(
-                entity.id(),
-                entity.reservationId(),
-                entity.amount(),
-                entity.status(),
-                entity.providerReference(),
-                entity.createdAt(),
-                entity.updatedAt()
         );
     }
 }

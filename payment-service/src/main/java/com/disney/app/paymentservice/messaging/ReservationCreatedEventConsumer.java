@@ -1,22 +1,20 @@
 package com.disney.app.paymentservice.messaging;
 
+import com.disney.app.paymentservice.config.AppKafkaProperties;
 import com.disney.app.paymentservice.event.ReservationCreatedEvent;
 import com.disney.app.paymentservice.service.PaymentService;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.Collections;
 import java.util.Map;
@@ -26,35 +24,28 @@ public class ReservationCreatedEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(ReservationCreatedEventConsumer.class);
 
-    private final KafkaReceiver<String, String> kafkaReceiver;
-    private final ObjectMapper objectMapper;
+    private final KafkaReceiver<String, byte[]> kafkaReceiver;
+    private final ReservationCreatedEventAvroDeserializer avroDeserializer;
     private final PaymentService paymentService;
-    private final MeterRegistry meterRegistry;
-    private final String reservationCreatedTopic;
     private Disposable subscription;
 
     public ReservationCreatedEventConsumer(
-            ObjectMapper objectMapper,
-            PaymentService paymentService,
-            MeterRegistry meterRegistry,
-            @Value("${app.kafka.bootstrap-servers}") String bootstrapServers,
-            @Value("${app.kafka.consumer.group-id}") String groupId,
-            @Value("${app.kafka.topics.reservation-created}") String reservationCreatedTopic
+            AppKafkaProperties properties,
+            ReservationCreatedEventAvroDeserializer avroDeserializer,
+            PaymentService paymentService
     ) {
-        this.objectMapper = objectMapper;
+        this.avroDeserializer = avroDeserializer;
         this.paymentService = paymentService;
-        this.meterRegistry = meterRegistry;
-        this.reservationCreatedTopic = reservationCreatedTopic;
 
-        ReceiverOptions<String, String> receiverOptions = ReceiverOptions.<String, String>create(Map.of(
-                        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                        ConsumerConfig.GROUP_ID_CONFIG, groupId,
+        ReceiverOptions<String, byte[]> receiverOptions = ReceiverOptions.<String, byte[]>create(Map.of(
+                        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getBootstrapServers(),
+                        ConsumerConfig.GROUP_ID_CONFIG, properties.getConsumer().getGroupId(),
                         ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
-                        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
-                        ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+                        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class,
+                        ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, properties.getConsumer().getAutoOffsetReset(),
                         ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false
                 ))
-                .subscription(Collections.singleton(reservationCreatedTopic));
+                .subscription(Collections.singleton(properties.getTopics().getReservationCreated()));
 
         this.kafkaReceiver = KafkaReceiver.create(receiverOptions);
     }
@@ -62,50 +53,14 @@ public class ReservationCreatedEventConsumer {
     @PostConstruct
     public void start() {
         subscription = kafkaReceiver.receive()
-                .concatMap(record -> {
-                    Timer.Sample sample = Timer.start(meterRegistry);
-
-                    return toEvent(record.value())
+                .concatMap(record -> toEvent(record.value())
                         .flatMap(paymentService::createPaymentFromReservation)
-                        .doOnNext(payment -> log.info("reservation_created_event_processed eventId={} reservationId={} paymentId={} status={}",
-                                record.receiverOffset().topicPartition(),
-                                payment.reservationId(),
-                                payment.id(),
-                                payment.status()))
-                        .doOnNext(payment -> {
-                            meterRegistry.counter(
-                                    "payment.event.consumed",
-                                    "topic",
-                                    reservationCreatedTopic,
-                                    "outcome",
-                                    "success"
-                            ).increment();
-                            sample.stop(meterRegistry.timer(
-                                    "payment.event.processing.duration",
-                                    "topic",
-                                    reservationCreatedTopic,
-                                    "outcome",
-                                    "success"
-                            ));
-                        })
-                        .doOnError(error -> {
-                            meterRegistry.counter(
-                                    "payment.event.consumed",
-                                    "topic",
-                                    reservationCreatedTopic,
-                                    "outcome",
-                                    error.getClass().getSimpleName()
-                            ).increment();
-                            sample.stop(meterRegistry.timer(
-                                    "payment.event.processing.duration",
-                                    "topic",
-                                    reservationCreatedTopic,
-                                    "outcome",
-                                    "error"
-                            ));
-                        })
-                        .then(Mono.fromRunnable(record.receiverOffset()::acknowledge));
-                })
+                        .doOnNext(payment -> log.info("reservation_created_event_processed reservationId={} paymentId={} status={}", payment.reservationId(), payment.id(),payment.status()))
+                        .then(Mono.fromRunnable(record.receiverOffset()::acknowledge))
+                        .onErrorResume(error -> {
+                            log.warn("reservation_created_event_processing_failed offset={} error={}", record.receiverOffset().offset(), error.getClass().getSimpleName());
+                            return Mono.empty();
+                        }))
                 .doOnError(error -> log.error("reservation_created_consumer_failed error={}", error.getClass().getSimpleName(), error))
                 .subscribe();
     }
@@ -117,7 +72,7 @@ public class ReservationCreatedEventConsumer {
         }
     }
 
-    private Mono<ReservationCreatedEvent> toEvent(String payload) {
-        return Mono.fromCallable(() -> objectMapper.readValue(payload, ReservationCreatedEvent.class));
+    private Mono<ReservationCreatedEvent> toEvent(byte[] payload) {
+        return Mono.fromCallable(() -> avroDeserializer.deserialize(payload));
     }
 }
