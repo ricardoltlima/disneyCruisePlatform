@@ -41,8 +41,6 @@ public class ResilienceConfig {
     public CircuitBreaker cruiseSearchCircuitBreaker() {
         CircuitBreakerConfig config = CircuitBreakerConfig.custom()
                 .failureRateThreshold(50)
-                .slowCallRateThreshold(50)
-                .slowCallDurationThreshold(Duration.ofSeconds(2))
                 .waitDurationInOpenState(Duration.ofSeconds(10))
                 .permittedNumberOfCallsInHalfOpenState(3)
                 .minimumNumberOfCalls(5)

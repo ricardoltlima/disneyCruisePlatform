@@ -1,4 +1,4 @@
-package com.disney.app.cruisesearchservice.model;
+package com.disney.app.reservationservice.model;
 
 public enum CruiseStatus {
     AVAILABLE,
