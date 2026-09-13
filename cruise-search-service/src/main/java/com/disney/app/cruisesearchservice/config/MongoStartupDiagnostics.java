@@ -2,7 +2,6 @@ package com.disney.app.cruisesearchservice.config;
 
 import com.mongodb.reactivestreams.client.MongoDatabase;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
@@ -18,12 +17,11 @@ public class MongoStartupDiagnostics implements ApplicationRunner {
 
     public MongoStartupDiagnostics(
             ReactiveMongoTemplate mongoTemplate,
-            @Value("${spring.mongodb.uri}") String configuredUri,
-            @Value("${spring.mongodb.database:}") String configuredDatabase
+            AppMongoProperties properties
     ) {
         this.mongoTemplate = mongoTemplate;
-        this.configuredUri = configuredUri;
-        this.configuredDatabase = configuredDatabase;
+        this.configuredUri = properties.uri();
+        this.configuredDatabase = properties.database();
     }
 
     @Override

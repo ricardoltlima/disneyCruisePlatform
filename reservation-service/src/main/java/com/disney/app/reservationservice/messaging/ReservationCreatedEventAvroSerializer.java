@@ -22,7 +22,7 @@ public class ReservationCreatedEventAvroSerializer {
 
     public ReservationCreatedEventAvroSerializer(AppKafkaProperties properties) throws IOException {
         this.schema = new Schema.Parser()
-                .parse(new ClassPathResource(properties.getSchemas().getReservationCreated()).getInputStream());
+                .parse(new ClassPathResource(properties.reservationCreatedSchema()).getInputStream());
     }
 
     public byte[] serialize(ReservationCreatedEvent event) throws IOException {

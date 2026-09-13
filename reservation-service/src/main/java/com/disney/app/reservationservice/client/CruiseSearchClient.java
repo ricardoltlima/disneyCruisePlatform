@@ -1,5 +1,6 @@
 package com.disney.app.reservationservice.client;
 
+import com.disney.app.reservationservice.config.CruiseSearchClientProperties;
 import com.disney.app.reservationservice.config.RequestLoggingFilter;
 import com.disney.app.reservationservice.error.CruiseSearchServiceException;
 import com.disney.app.reservationservice.error.TransientCruiseSearchServiceException;
@@ -9,7 +10,6 @@ import io.github.resilience4j.reactor.retry.RetryOperator;
 import io.github.resilience4j.retry.Retry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -32,17 +32,15 @@ public class CruiseSearchClient {
 
     public CruiseSearchClient(
             WebClient.Builder webClientBuilder,
-            @Value("${app.clients.cruise-search.base-url}") String baseUrl,
-            @Value("${app.clients.cruise-search.bearer-token}") String bearerToken,
-            @Value("${app.clients.cruise-search.timeout}") Duration timeout,
+            CruiseSearchClientProperties properties,
             @Qualifier("cruiseSearchRetry") Retry cruiseSearchRetry,
             CircuitBreaker cruiseSearchCircuitBreaker
     ) {
-        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
-        this.bearerToken = bearerToken;
+        this.webClient = webClientBuilder.baseUrl(properties.baseUrl()).build();
+        this.bearerToken = properties.bearerToken();
         this.cruiseSearchRetry = cruiseSearchRetry;
         this.cruiseSearchCircuitBreaker = cruiseSearchCircuitBreaker;
-        this.timeout = timeout;
+        this.timeout = properties.timeout();
     }
 
     public Mono<CruiseSearchResponse> getCruise(String cruiseId) {

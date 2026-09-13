@@ -36,14 +36,14 @@ public class ReservationCreatedEventConsumer {
         this.paymentService = paymentService;
 
         ReceiverOptions<String, byte[]> receiverOptions = ReceiverOptions.<String, byte[]>create(Map.of(
-                        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getBootstrapServers(),
-                        ConsumerConfig.GROUP_ID_CONFIG, properties.getConsumer().getGroupId(),
+                        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.bootstrapServers(),
+                        ConsumerConfig.GROUP_ID_CONFIG, properties.consumerGroupId(),
                         ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
                         ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class,
-                        ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, properties.getConsumer().getAutoOffsetReset(),
+                        ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, properties.consumerAutoOffsetReset(),
                         ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false
                 ))
-                .subscription(Collections.singleton(properties.getTopics().getReservationCreated()));
+                .subscription(Collections.singleton(properties.reservationCreatedTopic()));
 
         this.kafkaReceiver = KafkaReceiver.create(receiverOptions);
     }

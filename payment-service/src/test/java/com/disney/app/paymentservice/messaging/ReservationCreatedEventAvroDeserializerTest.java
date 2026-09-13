@@ -2,6 +2,7 @@ package com.disney.app.paymentservice.messaging;
 
 import com.disney.app.paymentservice.config.AppKafkaProperties;
 import com.disney.app.paymentservice.event.ReservationCreatedEvent;
+import com.disney.app.paymentservice.mapper.ReservationCreatedEventMapper;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -10,6 +11,7 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.springframework.core.io.ClassPathResource;
 
 import java.io.ByteArrayOutputStream;
@@ -20,9 +22,17 @@ class ReservationCreatedEventAvroDeserializerTest {
 
     @Test
     void deserializeReadsReservationCreatedEventPayload() throws Exception {
-        AppKafkaProperties properties = new AppKafkaProperties();
-        properties.getSchemas().setReservationCreated("avro/reservation-created-event.avsc");
-        ReservationCreatedEventAvroDeserializer deserializer = new ReservationCreatedEventAvroDeserializer(properties);
+        AppKafkaProperties properties = new AppKafkaProperties(
+                "localhost:9092",
+                "payment-service",
+                "earliest",
+                "reservation-created",
+                "avro/reservation-created-event.avsc"
+        );
+        ReservationCreatedEventAvroDeserializer deserializer = new ReservationCreatedEventAvroDeserializer(
+                properties,
+                Mappers.getMapper(ReservationCreatedEventMapper.class)
+        );
 
         ReservationCreatedEvent event = deserializer.deserialize(payload());
 

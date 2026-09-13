@@ -17,8 +17,13 @@ class ReservationCreatedEventAvroSerializerTest {
 
     @Test
     void serializeCreatesAvroPayloadForReservationCreatedEvent() throws Exception {
-        AppKafkaProperties properties = new AppKafkaProperties();
-        properties.getSchemas().setReservationCreated("avro/reservation-created-event.avsc");
+        AppKafkaProperties properties = new AppKafkaProperties(
+                "localhost:9092",
+                "reservation-created",
+                "all",
+                "reservation-service",
+                "avro/reservation-created-event.avsc"
+        );
         ReservationCreatedEventAvroSerializer serializer = new ReservationCreatedEventAvroSerializer(properties);
         LocalDateTime occurredAt = LocalDateTime.of(2026, 9, 12, 10, 30);
         ReservationCreatedEvent event = new ReservationCreatedEvent(

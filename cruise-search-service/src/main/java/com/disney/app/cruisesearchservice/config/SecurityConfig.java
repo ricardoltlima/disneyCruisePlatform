@@ -1,7 +1,6 @@
 package com.disney.app.cruisesearchservice.config;
 
 import com.disney.app.cruisesearchservice.error.ErrorResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +27,12 @@ import java.time.LocalDateTime;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
+    private final AppSecurityProperties properties;
+
+    public SecurityConfig(AppSecurityProperties properties) {
+        this.properties = properties;
+    }
+
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
             ServerHttpSecurity http,
@@ -53,8 +58,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public ReactiveJwtDecoder reactiveJwtDecoder(@Value("${app.security.jwt.secret}") String secret) {
-        SecretKey secretKey = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+    public ReactiveJwtDecoder reactiveJwtDecoder() {
+        SecretKey secretKey = new SecretKeySpec(properties.secret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(secretKey).build();
     }
 

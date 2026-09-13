@@ -27,13 +27,13 @@ public class ReservationCreatedEventPublisher {
             ReservationCreatedEventAvroSerializer avroSerializer
     ) {
         this.avroSerializer = avroSerializer;
-        this.topic = properties.getTopics().getReservationCreated();
+        this.topic = properties.reservationCreatedTopic();
         this.kafkaSender = KafkaSender.create(SenderOptions.create(Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getBootstrapServers(),
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.bootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class,
-                ProducerConfig.ACKS_CONFIG, properties.getProducer().getAcks(),
-                ProducerConfig.CLIENT_ID_CONFIG, properties.getProducer().getClientId()
+                ProducerConfig.ACKS_CONFIG, properties.producerAcks(),
+                ProducerConfig.CLIENT_ID_CONFIG, properties.producerClientId()
         )));
     }
 
@@ -49,11 +49,7 @@ public class ReservationCreatedEventPublisher {
                         )))
                         .single())
                 .doOnNext(result -> log.info("Reservation created event {} for reservation {} was published to topic {} at partition {} offset {}",
-                        event.eventId(),
-                        event.reservationId(),
-                        topic,
-                        result.recordMetadata().partition(),
-                        result.recordMetadata().offset()))
+                        event.eventId(), event.reservationId(), topic, result.recordMetadata().partition(), result.recordMetadata().offset()))
                 .then();
     }
 }
