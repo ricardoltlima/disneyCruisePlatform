@@ -54,14 +54,10 @@ public class ReservationCreatedEventConsumer {
                 .concatMap(record -> toEvent(record.value())
                         .flatMap(paymentService::createPaymentFromReservation)
                         .doOnNext(payment -> log.info("Reservation-created event processed. reservationId={} paymentId={} status={}",
-                                payment.reservationId(),
-                                payment.id(),
-                                payment.status()))
+                                payment.reservationId(), payment.id(), payment.status()))
                         .then(Mono.fromRunnable(record.receiverOffset()::acknowledge))
                         .onErrorResume(error -> {
-                            log.warn("Could not process reservation-created event. offset={} error={}",
-                                    record.receiverOffset().offset(),
-                                    error.getClass().getSimpleName());
+                            log.warn("Could not process reservation-created event. offset={} error={}", record.receiverOffset().offset(), error.getClass().getSimpleName());
                             return Mono.empty();
                         }))
                 .doOnError(error -> log.error("Reservation-created event consumer stopped unexpectedly. error={}", error.getClass().getSimpleName(), error))
